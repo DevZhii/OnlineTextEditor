@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Realtime TXT Editor</title>
+  <title>TXT Editor (Manual Save)</title>
   <style>
     body {
       margin: 0;
@@ -16,83 +16,139 @@
     header {
       background: #2c3e50;
       color: white;
-      padding: 15px 20px;
+      padding: 10px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
     header h1 {
       margin: 0;
       font-size: 18px;
     }
-    header span {
-      font-size: 13px;
-      color: #ddd;
+    .buttons {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      background: #3498db;
+      border: none;
+      color: white;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    button:disabled {
+      background: #7f8c8d;
+      cursor: not-allowed;
+    }
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 15px;
     }
     textarea {
       flex: 1;
       width: 100%;
-      border: none;
-      padding: 20px;
-      font-family: "Courier New", monospace;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 15px;
       font-size: 15px;
+      font-family: "Courier New", monospace;
       resize: none;
       outline: none;
-      box-sizing: border-box;
-      border-top: 1px solid #ccc;
+      background: #fff;
+    }
+    footer {
+      background: #ecf0f1;
+      text-align: center;
+      padding: 8px;
+      font-size: 13px;
+      color: #555;
+      border-top: 1px solid #ddd;
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>Realtime TXT Editor</h1>
-    <span id="status">🔄 Memuat...</span>
+    <h1>TXT Editor</h1>
+    <div class="buttons">
+      <button id="undoBtn" disabled>↶ Undo</button>
+      <button id="redoBtn" disabled>↷ Redo</button>
+      <button id="saveBtn">💾 Simpan</button>
+    </div>
   </header>
-  <textarea id="editor"></textarea>
+
+  <div class="editor-container">
+    <textarea id="editor" placeholder="Tulis teks di sini..."></textarea>
+  </div>
+
+  <footer>
+    Perubahan tidak otomatis tersimpan • Gunakan tombol <b>Simpan</b>
+  </footer>
 
   <script>
     const editor = document.getElementById("editor");
-    const statusEl = document.getElementById("status");
-    let typing = false;
+    const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
+    const saveBtn = document.getElementById("saveBtn");
 
-    // ambil teks awal
-    async function loadText() {
-      try {
-        const res = await fetch("/api/load");
-        const data = await res.json();
-        if (!typing) editor.value = data.text;
-        statusEl.textContent = "✔️ Sinkron";
-      } catch {
-        statusEl.textContent = "❌ Gagal ambil data";
-      }
+    // --- Undo / Redo Stack ---
+    let undoStack = [];
+    let redoStack = [];
+
+    function updateButtons() {
+      undoBtn.disabled = undoStack.length === 0;
+      redoBtn.disabled = redoStack.length === 0;
     }
 
-    // simpan teks
-    async function saveText() {
-      try {
-        statusEl.textContent = "💾 Menyimpan...";
-        await fetch("/api/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: editor.value }),
-        });
-        statusEl.textContent = "✔️ Tersimpan";
-      } catch {
-        statusEl.textContent = "❌ Gagal simpan";
-      }
-    }
-
-    // auto sync setiap 2 detik
-    setInterval(loadText, 2000);
-
-    // simpan otomatis saat mengetik
     editor.addEventListener("input", () => {
-      typing = true;
-      saveText();
-      setTimeout(() => typing = false, 800);
+      undoStack.push(editor.value);
+      redoStack = []; // reset redo setelah edit
+      updateButtons();
     });
 
-    // load pertama kali
+    undoBtn.addEventListener("click", () => {
+      if (undoStack.length > 0) {
+        redoStack.push(editor.value);
+        editor.value = undoStack.pop();
+        updateButtons();
+      }
+    });
+
+    redoBtn.addEventListener("click", () => {
+      if (redoStack.length > 0) {
+        undoStack.push(editor.value);
+        editor.value = redoStack.pop();
+        updateButtons();
+      }
+    });
+
+    // --- Simpan manual ---
+    async function saveText() {
+      await fetch("/api/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: editor.value }),
+      });
+      alert("✔️ Teks berhasil disimpan!");
+    }
+
+    saveBtn.addEventListener("click", saveText);
+
+    // --- Load teks awal ---
+    async function loadText() {
+      const res = await fetch("/api/load");
+      const data = await res.json();
+      editor.value = data.text;
+    }
+
     loadText();
   </script>
 </body>
