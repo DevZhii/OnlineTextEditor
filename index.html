@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime TXT Editor</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background: #2c3e50;
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+    header span {
+      font-size: 13px;
+      color: #ddd;
+    }
+    textarea {
+      flex: 1;
+      width: 100%;
+      border: none;
+      padding: 20px;
+      font-family: "Courier New", monospace;
+      font-size: 15px;
+      resize: none;
+      outline: none;
+      box-sizing: border-box;
+      border-top: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Realtime TXT Editor</h1>
+    <span id="status">🔄 Memuat...</span>
+  </header>
+  <textarea id="editor"></textarea>
+
+  <script>
+    const editor = document.getElementById("editor");
+    const statusEl = document.getElementById("status");
+    let typing = false;
+
+    // ambil teks awal
+    async function loadText() {
+      try {
+        const res = await fetch("/api/load");
+        const data = await res.json();
+        if (!typing) editor.value = data.text;
+        statusEl.textContent = "✔️ Sinkron";
+      } catch {
+        statusEl.textContent = "❌ Gagal ambil data";
+      }
+    }
+
+    // simpan teks
+    async function saveText() {
+      try {
+        statusEl.textContent = "💾 Menyimpan...";
+        await fetch("/api/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: editor.value }),
+        });
+        statusEl.textContent = "✔️ Tersimpan";
+      } catch {
+        statusEl.textContent = "❌ Gagal simpan";
+      }
+    }
+
+    // auto sync setiap 2 detik
+    setInterval(loadText, 2000);
+
+    // simpan otomatis saat mengetik
+    editor.addEventListener("input", () => {
+      typing = true;
+      saveText();
+      setTimeout(() => typing = false, 800);
+    });
+
+    // load pertama kali
+    loadText();
+  </script>
+</body>
+</html>
